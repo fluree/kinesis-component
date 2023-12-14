@@ -1,6 +1,6 @@
 # com.fluree/kinesis-component
 
-Fluree Kinesis donut.system component
+Fluree Kinesis [donut.system](https://github.com/donut-party/system) component
 
 ## Usage
 
