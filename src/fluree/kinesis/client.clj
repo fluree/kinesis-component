@@ -11,9 +11,9 @@
 
 (def component
   #::ds{:start
-        (fn [{{:keys [aws/region kinesis/endpoint-override aws/access-key-id]
+        (fn [{{:keys [aws/region aws/endpoint-override aws/access-key-id]
                :as   config} ::ds/config}]
-          (log/debug "Kinesis config" config)
+          (log/debug "Kinesis config:" config)
           (let [builder   (.region (KinesisAsyncClient/builder)
                                    (Region/of region))
                 builder*  (if endpoint-override
