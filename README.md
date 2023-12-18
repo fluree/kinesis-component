@@ -12,3 +12,5 @@ com.fluree/kinesis-component {:git/url "https://github.com/fluree/kinesis-compon
 ## License
 
 Copyright © 2023 Fluree, PBC
+
+See LICENSE file.
