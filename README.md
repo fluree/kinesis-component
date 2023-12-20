@@ -18,10 +18,10 @@ com.fluree/kinesis-component {:git/url "https://github.com/fluree/kinesis-compon
   {::ds/defs
    {:aws        {:kinesis/client kinesis/client
                  :kinesis/stream kinesis/stream}
-    :aws/config {:aws/region "us-west-2" ; required
-                 :aws/endpoint-override "http://localhost:4566" ; optional
-                 :aws/access-key-id "..." ; optional & not recommended for real credentials
-                 :kinesis/stream-name "foo" ; required
+    :aws/config {:aws/region             "us-west-2" ; required
+                 :aws/endpoint-override  "http://localhost:4566" ; optional
+                 :aws/access-key-id      "..." ; optional & not recommended for real credentials
+                 :kinesis/stream-name    "foo" ; required
                  :kinesis/create-stream? true ; optional; defaults to false
                  }}})
 ```
