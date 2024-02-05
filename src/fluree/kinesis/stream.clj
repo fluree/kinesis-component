@@ -63,7 +63,7 @@
                                       (.partitionKey ledger-name)
                                       (.streamName stream-name)
                                       (.data (-> data
-                                                 json/stringify
+                                                 pr-str
                                                  SdkBytes/fromUtf8String))
                                       .build)]
     (try
