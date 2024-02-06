@@ -1,6 +1,5 @@
 (ns fluree.kinesis.stream
   (:require [donut.system :as ds]
-            [fluree.db.util.json :as json]
             [fluree.db.util.log :as log])
   (:import (java.util.concurrent ExecutionException)
            (software.amazon.awssdk.core SdkBytes)
