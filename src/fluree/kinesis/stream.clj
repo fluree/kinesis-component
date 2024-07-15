@@ -1,57 +1,117 @@
 (ns fluree.kinesis.stream
-  (:require [donut.system :as ds]
-            [fluree.db.util.log :as log])
-  (:import (java.util.concurrent ExecutionException)
+  (:require [fluree.db.util.log :as log])
+  (:refer-clojure :exclude [list])
+  (:import (java.util.concurrent CompletableFuture ExecutionException)
            (software.amazon.awssdk.core SdkBytes)
            (software.amazon.awssdk.services.kinesis KinesisAsyncClient)
-           (software.amazon.awssdk.services.kinesis.model CreateStreamRequest
-                                                          PutRecordRequest
-                                                          ListStreamsRequest
-                                                          ListStreamsResponse)))
+           (software.amazon.awssdk.services.kinesis.model
+            CreateStreamRequest DescribeStreamSummaryRequest
+            StreamDescriptionSummary StreamStatus DescribeStreamSummaryResponse
+            PutRecordRequest ListStreamsRequest ListStreamsResponse
+            StreamSummary)))
+
+(set! *warn-on-reflection* true)
+
+(defmulti dejavaify-stream-summary (fn [pojo] (class pojo)))
+
+(defmethod dejavaify-stream-summary StreamSummary
+  [^StreamSummary summary]
+  {:name   (.streamName summary)
+   :arn    (.streamARN summary)
+   :status (.streamStatus summary)})
+
+(defmethod dejavaify-stream-summary StreamDescriptionSummary
+  [^StreamDescriptionSummary summary]
+  {:name   (.streamName summary)
+   :arn    (.streamARN summary)
+   :status (.streamStatus summary)})
+
+(defn list
+  [^KinesisAsyncClient client & [short-circuit-name]]
+  (loop [first-stream nil
+         streams      []]
+    (let [stream-req   (if first-stream
+                         (-> client
+                             (.listStreams
+                              ^ListStreamsRequest
+                              (-> (ListStreamsRequest/builder)
+                                  (.exclusiveStartStreamName first-stream)
+                                  .build)))
+                         (.listStreams client))
+          stream-res   ^ListStreamsResponse (.get ^CompletableFuture stream-req)
+          _            (log/debug "Received stream list response:"
+                                  (str stream-res))
+          summaries    (->> stream-res .streamSummaries
+                            (map dejavaify-stream-summary))
+          next-streams (concat streams summaries)]
+      (if-let [summary (and short-circuit-name
+                            (some #(when (= short-circuit-name (:name %)) %)
+                                  summaries))]
+        [summary]
+        (if (.hasMoreStreams stream-res)
+          (recur (-> summaries last :name) next-streams)
+          next-streams)))))
+
+(defn summary
+  [client stream-name]
+  (let [streams (list client stream-name)
+        fstream (first streams)]
+    (when (and (= 1 (count streams))
+               (= stream-name (:name fstream)))
+      fstream)))
 
 (defn exists?
   [client stream-name]
   (log/debug "Checking if Kinesis stream" stream-name "exists")
-  (loop [first-stream nil]
-    (let [stream-req (if first-stream
-                       (-> client
-                           (.listStreams
-                            (-> (ListStreamsRequest/builder)
-                                (.exclusiveStartStreamName first-stream)
-                                .build)))
-                       (.listStreams client))
-          stream-res ^ListStreamsResponse (.get stream-req)
-          streams    (.streamNames stream-res)]
-      (if ((set streams) stream-name)
-        true
-        (if (.hasMoreStreams stream-res)
-          (recur (last streams))
-          false)))))
+  (->> stream-name (summary client) boolean))
 
 (defn create!
-  [client stream-name]
+  [^KinesisAsyncClient client stream-name]
   (log/debug "Creating Kinesis stream" stream-name)
-  (-> client
-      (.createStream
-       ^CreateStreamRequest
-       (-> (CreateStreamRequest/builder)
-           (.streamName stream-name)
-           .build))
-      .get))
+  (let [stream (-> client
+                   ^CompletableFuture
+                   (.createStream
+                    ^CreateStreamRequest
+                    (-> (CreateStreamRequest/builder)
+                        (.streamName stream-name)
+                        .build))
+                   .get)]
+    (log/debug "Waiting for Kinesis stream" stream-name "to be ACTIVE")
+    (loop []
+      (let [summary-resp (-> client
+                             ^CompletableFuture
+                             (.describeStreamSummary
+                              ^DescribeStreamSummaryRequest
+                              (-> (DescribeStreamSummaryRequest/builder)
+                                  (.streamName stream-name)
+                                  .build))
+                             .get)
+            {:keys [status] :as summary} (-> ^DescribeStreamSummaryResponse
+                                             summary-resp
+                                             .streamDescriptionSummary
+                                             dejavaify-stream-summary)]
+        (if (= status StreamStatus/ACTIVE)
+          summary
+          (do
+            (Thread/sleep 500)
+            (recur)))))))
 
-(def component
-  #::ds{:start
-        (fn [{{:keys [kinesis/client]
-               {:keys [kinesis/stream-name kinesis/create-stream?]} :aws/config}
-              ::ds/config}]
-          (log/info "Kinesis client:" client)
-          (log/info "Kinesis stream:" stream-name)
-          (when create-stream?
-            (when-not (exists? client stream-name)
-              (create! client stream-name)))
-          stream-name)
-        :config {:kinesis/client (ds/local-ref [:kinesis/client])
-                 :aws/config     (ds/ref [:env :aws/config])}})
+(defn start
+  [{:keys                                                [aws/kinesis-client]
+    {:keys [kinesis/stream-name kinesis/create-stream?]} :aws/config}]
+  (log/info "Kinesis stream:" stream-name)
+  (let [stream-exists? (exists? kinesis-client stream-name)
+        stream         (if stream-exists?
+                         (summary kinesis-client stream-name)
+                         (if create-stream?
+                           (do
+                             (log/info "Kinesis stream doesn't exist, creating it")
+                             (create! kinesis-client stream-name))
+                           (throw (IllegalArgumentException.
+                                   (str "Kinesis stream " stream-name
+                                        " does not exist")))))]
+    (log/info "Kinesis stream ARN:" (:arn stream))
+    {:stream stream, :client kinesis-client}))
 
 (defn publish-record
   "Given a kinesis stream name and some data, creates a PutRecordRequest bound for that stream that contains the provided data."
@@ -67,7 +127,7 @@
                                       .build)]
     (try
       (let [result (.get (.putRecord kinesis-client request))]
-        (log/debug "Kinesis record publish result:" result)
+        (log/debug "Kinesis record publish result:" (.toString result))
         result)
       (catch InterruptedException _
         (log/warn "Interrupted, assuming shutdown."))
