@@ -1,12 +1,12 @@
 {:paths ["src" "resources"]
- :deps  {org.clojure/clojure                           {:mvn/version "1.11.1"}
+ :deps  {org.clojure/clojure                           {:mvn/version "1.11.3"}
          integrant/integrant                           {:mvn/version "0.10.0"}
          aero/aero                                     {:mvn/version "1.1.6"}
-         software.amazon.awssdk/kinesis                {:mvn/version "2.21.40"}
-         software.amazon.kinesis/amazon-kinesis-client {:mvn/version "2.5.3"}
          com.fluree/db                                 {:git/url    "https://github.com/fluree/db.git"
                                                         :git/sha    "4b6a864587c4b75b7c7f0fd5de854ca65bea6570"
                                                         :exclusions [metosin/malli]}}
+         software.amazon.awssdk/kinesis                {:mvn/version "2.26.20"}
+         software.amazon.kinesis/amazon-kinesis-client {:mvn/version "2.6.0"}
 
  :aliases
  {:test
@@ -15,6 +15,6 @@
                  io.github.cognitect-labs/test-runner
                  {:git/tag "v0.5.1" :git/sha "dfb30dd"}}}
   :build {:deps       {io.github.clojure/tools.build
-                       {:mvn/version "0.9.6"}
-                       slipset/deps-deploy {:mvn/version "0.2.0"}}
+                       {:mvn/version "0.10.5"}
+                       slipset/deps-deploy {:mvn/version "0.2.2"}}
           :ns-default build}}}
