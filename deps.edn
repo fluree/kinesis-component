@@ -3,9 +3,7 @@
          integrant/integrant                           {:mvn/version "0.10.0"}
          aero/aero                                     {:mvn/version "1.1.6"}
          software.amazon.awssdk/kinesis                {:mvn/version "2.26.20"}
-         software.amazon.kinesis/amazon-kinesis-client {:mvn/version "2.6.0"}
-         com.fluree/db                                 {:git/url "https://github.com/fluree/db.git"
-                                                        :git/sha "6bc58c39686f2856be49780f56e3a5d19d4d7bf1"}}
+         software.amazon.kinesis/amazon-kinesis-client {:mvn/version "2.6.0"}}
 
  :aliases
  {:test
